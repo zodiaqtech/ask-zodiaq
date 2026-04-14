@@ -1,8 +1,16 @@
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
-python-dotenv==1.0.0
-aiohttp==3.9.1
-requests==2.31.0
-httpx==0.26.0
+# Ask ZodiaQ dependencies
+# These are already present in the shared AI-predigest venv at:
+#   /Users/sankit/Desktop/Personalised Horoscope/venv/
+#
+# Recommended: reuse that venv (see README).
+# To install into a fresh venv:
+#   python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.3
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
+aiohttp>=3.9.1
+requests>=2.31.0
+httpx>=0.26.0

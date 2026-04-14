@@ -5,7 +5,7 @@ Usage:
     cp .env.example .env
     # Set AI_PREDIGEST_PATH in .env
     pip install -r requirements.txt
-    uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+    ./start.sh
 """
 import os
 import sys
@@ -18,11 +18,17 @@ from fastapi.middleware.cors import CORSMiddleware
 # ── Bootstrap: ensure AI-predigest is importable before anything else ─────
 from dotenv import load_dotenv
 
-load_dotenv()  # load .env from project root
+load_dotenv()  # load ask-zodiaq .env (sets AI_PREDIGEST_PATH, PORT, HOST)
 
 _predigest_path = os.environ.get(
     "AI_PREDIGEST_PATH", "/Users/sankit/Downloads/AI-predigest"
 )
+
+# Also load AI-predigest's own .env so its API keys (KP_AUTH_TOKEN etc.) are
+# available when astro_api.py calls get_settings() at import time.
+# override=False means ask-zodiaq vars always win if there's a name clash.
+load_dotenv(os.path.join(_predigest_path, ".env"), override=False)
+
 if _predigest_path not in sys.path:
     sys.path.insert(0, _predigest_path)
 
@@ -61,7 +67,7 @@ app.add_middleware(
 )
 
 # ── Routes ────────────────────────────────────────────────────────────────
-from app.api.routes import router
+from zodiaq.api.routes import router
 
 app.include_router(router)
 

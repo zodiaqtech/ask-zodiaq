@@ -29,12 +29,13 @@ def _bootstrap_predigest_path() -> None:
 
 _bootstrap_predigest_path()
 
-# ── Predigest imports (available after bootstrap) ─────────────────────────
+# ── Predigest imports — these use "app.*" because they come from AI-predigest
+# (the bootstrap above added AI-predigest to sys.path first so "app" resolves there)
 from app.services.astro_api import kp_api, vedic_api          # singletons
 from app.services.astro_engine import AstroEngine
-from app.services.kp_timing_enhanced import kp_timing_engine
+from app.services.timing_engine import kp_timing_engine       # KPTimingEngine singleton
 
-# Domain evaluators
+# Domain evaluators (also from AI-predigest)
 from app.domains.marriage.marriage_prospects.evaluator import (
     MarriageProspectsEvaluator,
 )
@@ -103,10 +104,9 @@ async def fetch_chart(
     No LLM involved — pure astrological data only.
     """
     # ── 1. KP API: cuspal (house cusps) + planetary positions ─────────────
-    tob_hms = tob if len(tob) > 5 else tob + ":00"
-
-    cuspal_resp = kp_api.fetch_cuspal(name, sex, dob, tob_hms, lat, lon, tz=timezone)
-    planet_resp = kp_api.fetch_planetary_positions(name, sex, dob, tob_hms, lat, lon, tz=timezone)
+    # kp_api._make_payload expects "HH:MM" — pass tob as-is (user provides HH:MM)
+    cuspal_resp = kp_api.fetch_cuspal(name, sex, dob, tob, lat, lon, tz=timezone)
+    planet_resp = kp_api.fetch_planetary_positions(name, sex, dob, tob, lat, lon, tz=timezone)
 
     cusps_raw         = cuspal_resp.get("data", {}).get("table_data", {})
     planet_in_houses_raw = cuspal_resp.get("data", {}).get("data", {})
@@ -121,7 +121,7 @@ async def fetch_chart(
     flat_dasha: List[Dict] = []
     try:
         extended_dasha = vedic_api.fetch_extended_dasha_for_timing(
-            dob, tob_hms, lat, lon, years_ahead=10, tz=timezone
+            dob, tob, lat, lon, years_ahead=10, tz=timezone
         )
         flat_dasha = _astro_engine._parse_dasha_dates(extended_dasha)
         flat_dasha = _astro_engine._limit_dasha_to_years(flat_dasha, years=7)
@@ -140,7 +140,7 @@ async def fetch_chart(
         flat_dasha=flat_dasha,
         dob_dt=dob_dt,
         dob=dob,
-        tob=tob_hms,
+        tob=tob,
         sex=sex,
         lat=lat,
         lon=lon,
@@ -239,6 +239,12 @@ def _score_to_verdict(score: float, threshold_yes: float = 55.0, threshold_no: f
     return "Moderate"
 
 
+def _ordinal(n: int) -> str:
+    """Return ordinal string for a house number (1 → '1st', 7 → '7th')."""
+    suffixes = {1: "st", 2: "nd", 3: "rd"}
+    return f"{n}{suffixes.get(n if n <= 3 else 0, 'th')}"
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # Topic-specific evaluation functions
 # ─────────────────────────────────────────────────────────────────────────
@@ -263,7 +269,11 @@ async def evaluate_marriage(chart: ChartData) -> Dict[str, Any]:
 
     # Nature of marriage (love vs arranged)
     # KP rule: if 5th house connects to 7th CSL significations → love marriage
-    marriage_nature = _derive_marriage_nature(chart.planets, chart.houses)
+    marriage_nature, marriage_nature_reason = _derive_marriage_nature(chart.planets, chart.houses)
+
+    # 7th cusp details for context
+    cusp7 = next((h for h in chart.houses if h.get("house") == 7), {})
+    csl7  = cusp7.get("cusp_sub_lord", "—")
 
     return {
         "promise_state": result.promise_state,
@@ -271,33 +281,51 @@ async def evaluate_marriage(chart: ChartData) -> Dict[str, Any]:
         "best_window":    best,
         "spouse_direction": spouse_direction,
         "marriage_nature":  marriage_nature,
-        "all_windows":      windows,
+        "marriage_nature_reason": marriage_nature_reason,
+        "csl7": csl7,
+        "all_windows": windows,
     }
 
 
-def _derive_marriage_nature(planets: Dict, houses: List[Dict]) -> str:
+def _derive_marriage_nature(planets: Dict, houses: List[Dict]) -> Tuple[str, str]:
     """
     Love if 5th CSL or Venus signifies 7th/5th prominently; arranged otherwise.
-    Simple heuristic — does not need LLM.
+    Returns (nature, reason) — reason is chart-specific.
     """
     try:
         cusp5  = next((h for h in houses if h.get("house") == 5), {})
-        csl5   = cusp5.get("cusp_sub_lord", "")
+        csl5   = cusp5.get("cusp_sub_lord", "") or "—"
+        cusp7  = next((h for h in houses if h.get("house") == 7), {})
+        csl7   = cusp7.get("cusp_sub_lord", "") or "—"
         venus  = planets.get("Venus", {})
         v_house = venus.get("house", 0)
 
         # Venus in 5th or 7th house is a love indicator
         if v_house in (5, 7):
-            return "Love Marriage"
+            reason = (
+                f"Venus in {_ordinal(v_house)} house is a direct love indicator; "
+                f"7th CSL is {csl7}"
+            )
+            return "Love Marriage", reason
 
         # 5th CSL in 5th or 7th house chain
         csl5_planet = planets.get(csl5, {})
-        if csl5_planet.get("house") in (5, 7):
-            return "Love Marriage"
+        csl5_house  = csl5_planet.get("house", 0)
+        if csl5_house in (5, 7):
+            reason = (
+                f"5th CSL ({csl5}) is placed in {_ordinal(csl5_house)} house, "
+                f"linking romance to 7th; Venus is in {_ordinal(v_house)} house"
+            )
+            return "Love Marriage", reason
 
-        return "Arranged Marriage"
+        reason = (
+            f"Venus in {_ordinal(v_house)} house; 5th CSL ({csl5}) in "
+            f"{_ordinal(csl5_house) if csl5_house else '—'} house — "
+            f"no strong 5th–7th connection; 7th CSL is {csl7}"
+        )
+        return "Arranged Marriage", reason
     except Exception:
-        return "—"
+        return "—", "—"
 
 
 async def evaluate_job(chart: ChartData) -> Dict[str, Any]:
@@ -319,6 +347,15 @@ async def evaluate_job(chart: ChartData) -> Dict[str, Any]:
     business_score = svb.get("business", 0)
     job_verdict = "Yes" if service_score >= business_score else "Moderate"
 
+    # House-lord context for specific details
+    summary      = (ad.get("career_analysis_summary") or {})
+    weak_lords   = summary.get("weak_lords", 0)
+    strong_lords = summary.get("strong_lords", 0)
+    cusp6  = next((h for h in chart.houses if h.get("house") == 6), {})
+    cusp10 = next((h for h in chart.houses if h.get("house") == 10), {})
+    csl6   = cusp6.get("cusp_sub_lord", "—")
+    csl10  = cusp10.get("cusp_sub_lord", "—")
+
     return {
         "promise_state":  result.promise_state,
         "nearest_window": nearest,
@@ -326,6 +363,12 @@ async def evaluate_job(chart: ChartData) -> Dict[str, Any]:
         "has_obstacles":  has_obstacles,
         "job_verdict":    job_verdict,
         "all_windows":    windows,
+        "job_details": {
+            "csl6":         csl6,
+            "csl10":        csl10,
+            "weak_lords":   weak_lords,
+            "strong_lords": strong_lords,
+        },
     }
 
 
@@ -352,12 +395,19 @@ async def evaluate_house(chart: ChartData) -> Dict[str, Any]:
 
     purchase_verdict = _promise_to_verdict(result.promise_state)
 
+    cusp4  = next((h for h in chart.houses if h.get("house") == 4), {})
+    cusp11 = next((h for h in chart.houses if h.get("house") == 11), {})
+    csl4   = cusp4.get("cusp_sub_lord", "—")
+    csl11  = cusp11.get("cusp_sub_lord", "—")
+
     return {
         "promise_state":    result.promise_state,
         "purchase_verdict": purchase_verdict,
         "nearest_window":   nearest,
         "best_window":      best,
         "all_windows":      windows,
+        "csl4":             csl4,
+        "csl11":            csl11,
     }
 
 
@@ -385,6 +435,14 @@ async def evaluate_career_best(chart: ChartData) -> Dict[str, Any]:
 
     # Obstacle analysis
     has_obstacles = _has_career_obstacles(ad)
+    summary      = (ad.get("career_analysis_summary") or {})
+    weak_lords   = summary.get("weak_lords", 0)
+    strong_lords = summary.get("strong_lords", 0)
+
+    # 10th house CSL / lord for specific reason text
+    cusp10 = next((h for h in chart.houses if h.get("house") == 10), {})
+    csl10  = cusp10.get("cusp_sub_lord", "—")
+    lord10 = cusp10.get("rashi_lord", "—")
 
     return {
         "promise_state":  result.promise_state,
@@ -392,6 +450,10 @@ async def evaluate_career_best(chart: ChartData) -> Dict[str, Any]:
         "career_fields":  career_fields,
         "has_obstacles":  has_obstacles,
         "svb_scores":     svb,
+        "csl10_planet":   csl10,
+        "lord10_planet":  lord10,
+        "weak_lords":     weak_lords,
+        "strong_lords":   strong_lords,
     }
 
 
@@ -508,4 +570,12 @@ async def evaluate_government_job(chart: ChartData) -> Dict[str, Any]:
         "nearest_window": nearest,
         "best_window":    best,
         "all_windows":    windows,
+        # Chart-specific details for rich display
+        "sun_house":      sun_house,
+        "sun_retro":      bool(sun.get("is_retro")),
+        "csl10":          csl10 or "—",
+        "mercury_house":  mercury.get("house", 0),
+        "saturn_house":   saturn.get("house", 0),
+        "govt_score":     govt_score,
+        "exam_score":     exam_score,
     }

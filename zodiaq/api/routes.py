@@ -10,10 +10,10 @@ import traceback
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
-from app.models.request import ZodiaQRequest, ZodiaQTopic
-from app.models.response import ZodiaQResponse
-from app.engine import zodiaq_engine as engine
-from app.engine import formatters
+from zodiaq.models.request import ZodiaQRequest, ZodiaQTopic
+from zodiaq.models.response import ZodiaQResponse
+from zodiaq.engine import zodiaq_engine as engine
+from zodiaq.engine import formatters
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ async def ask_zodiaq(req: ZodiaQRequest) -> ZodiaQResponse:
         # ── 1. Fetch and normalise the birth chart (KP + Vedic API) ─────
         chart = await engine.fetch_chart(
             name=bd.name,
-            sex=bd.sex,
+            sex=bd.sex_full,   # normalised to "male"/"female"
             dob=bd.dob,
             tob=bd.tob,
             lat=bd.lat,
@@ -55,29 +55,31 @@ async def ask_zodiaq(req: ZodiaQRequest) -> ZodiaQResponse:
         # ── 2. Route to the correct topic evaluator ───────────────────
         topic = req.topic
 
+        lang = req.language   # "Hindi" or "English"
+
         if topic == ZodiaQTopic.MARRIAGE:
             data     = await engine.evaluate_marriage(chart)
-            response = formatters.format_marriage(data)
+            response = formatters.format_marriage(data, language=lang)
 
         elif topic == ZodiaQTopic.JOB:
             data     = await engine.evaluate_job(chart)
-            response = formatters.format_job(data)
+            response = formatters.format_job(data, language=lang)
 
         elif topic == ZodiaQTopic.HOUSE:
             data     = await engine.evaluate_house(chart)
-            response = formatters.format_house(data)
+            response = formatters.format_house(data, language=lang)
 
         elif topic == ZodiaQTopic.CAREER_BEST:
             data     = await engine.evaluate_career_best(chart)
-            response = formatters.format_career_best(data)
+            response = formatters.format_career_best(data, language=lang)
 
         elif topic == ZodiaQTopic.BUSINESS:
             data     = await engine.evaluate_business(chart)
-            response = formatters.format_business(data)
+            response = formatters.format_business(data, language=lang)
 
         elif topic == ZodiaQTopic.GOVERNMENT_JOB:
             data     = await engine.evaluate_government_job(chart)
-            response = formatters.format_government_job(data)
+            response = formatters.format_government_job(data, language=lang)
 
         else:
             raise HTTPException(status_code=400, detail=f"Unknown topic: {topic}")
