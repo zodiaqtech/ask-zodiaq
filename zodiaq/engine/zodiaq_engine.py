@@ -33,7 +33,12 @@ _bootstrap_predigest_path()
 # (the bootstrap above added AI-predigest to sys.path first so "app" resolves there)
 from app.services.astro_api import kp_api, vedic_api          # singletons
 from app.services.astro_engine import AstroEngine
-from app.services.timing_engine import kp_timing_engine       # KPTimingEngine singleton
+from app.services.timing_engine import (
+    kp_timing_engine,
+    get_top_timing_windows,
+    apply_transit_scores_to_windows,
+    format_timing_windows,
+)
 
 # Local ephemeris — zero-cost transit scoring via pyswisseph
 from zodiaq.engine import local_ephemeris
@@ -159,12 +164,16 @@ def get_timing_windows(
 ) -> List[Dict]:
     """
     Run KP timing engine with local-ephemeris transit scoring (zero API cost).
-    Falls back to base timing (no transit) if local_ephemeris is unavailable.
+
+    Calls the pipeline directly so that transit scoring does not truncate the
+    candidate list before _best_and_nearest() can select:
+      - nearest  = earliest future window (chronological)
+      - best     = highest pure KP domain score (not transit-inflated)
+
+    Falls back to base timing (no transit) if pyswisseph is unavailable.
     Returns [] if no favourable windows found.
     """
-    # Closures that satisfy calculate_timing_windows_with_transit's callable contract.
-    # Both use pyswisseph locally — no external API call at all.
-    natal_houses = chart.houses  # captured by closure
+    natal_houses = chart.houses
 
     def _fetch_transit(mid_date: datetime) -> Dict:
         planets_list = local_ephemeris.get_transit_planets(mid_date, natal_houses)
@@ -174,22 +183,34 @@ def get_timing_windows(
         return local_ephemeris.get_kp_lords_for_date(mid_date)
 
     try:
-        windows = kp_timing_engine.calculate_timing_windows_with_transit(
+        # Fetch a wider candidate pool so long-term high-quality windows
+        # (e.g. Venus Mahadasha in 2031-32) aren't dropped before scoring.
+        raw = get_top_timing_windows(
             dba_list=chart.flat_dasha,
             dob=chart.dob_dt,
             planets=chart.planets,
             houses=chart.houses,
             domain=domain,
+            timing_name=timing_name,
+            max_windows=max_windows * 4,
+        )
+        if not raw:
+            return []
+
+        # Apply transit scores to all candidates (no truncation yet).
+        scored = apply_transit_scores_to_windows(
+            windows=raw,
             fetch_transit_for_date=_fetch_transit,
             fetch_kp_snapshot=_fetch_kp_snapshot,
             sex=chart.sex,
             lat=chart.lat,
             lon=chart.lon,
             tzone=str(chart.timezone),
-            timing_name=timing_name,
-            max_windows=max_windows,
         )
-        return windows or []
+
+        # Return all scored windows; _best_and_nearest() will pick correctly.
+        return format_timing_windows(scored, include_transit=True) or []
+
     except Exception as exc:
         logger.warning(f"get_timing_windows({timing_name}) transit path failed ({exc}); falling back to base timing")
         try:
@@ -236,8 +257,9 @@ def _best_and_nearest(windows: List[Dict]) -> Tuple[Optional[Dict], Optional[Dic
     future = [w for w in windows if _parse_date(w.get("start")) >= now]
     nearest = min(future, key=lambda w: _parse_date(w.get("start")), default=None) or windows[0]
 
-    # Best = highest final_score (or score)
-    best = max(windows, key=lambda w: w.get("final_score") or w.get("score") or 0)
+    # Best = highest pure KP domain score (transit score intentionally excluded
+    # so near-term transit boosts don't mask a cleaner long-term dasha window).
+    best = max(windows, key=lambda w: w.get("score") or 0)
 
     return best, nearest
 
