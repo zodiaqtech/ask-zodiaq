@@ -1,0 +1,79 @@
+# GitHub Actions workflow for Azure Web App Deployment
+# File: .github/workflows/azure-deploy.yml
+
+name: Deploy to Azure Web App
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  AZURE_WEBAPP_NAME: myzodiaq-api    # Change this to your app name
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Step 1: Checkout code
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # Step 2: Set up Python
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    # Step 3: Create and activate virtual environment
+    - name: Create virtual environment
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+
+    # Step 4: Install dependencies
+    - name: Install dependencies
+      run: |
+        source venv/bin/activate
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    # Step 5: Run tests (optional - uncomment if you have tests)
+    # - name: Run tests
+    #   run: |
+    #     source venv/bin/activate
+    #     pip install pytest
+    #     pytest tests/ -v
+
+    # Step 6: Prepare deployment package
+    - name: Prepare deployment package
+      run: |
+        # Create deployment package (excluding unnecessary files)
+        mkdir -p deploy
+        cp -r app deploy/
+        cp -r config deploy/
+        cp main.py deploy/
+        cp requirements.txt deploy/
+        
+        # Create startup script
+        echo '#!/bin/bash
+        gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 120' > deploy/startup.sh
+        chmod +x deploy/startup.sh
+
+    # Step 7: Deploy to Azure Web App
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: ./deploy
+
+    # Step 8: Health check
+    - name: Health check
+      run: |
+        sleep 30  # Wait for app to start
+        curl -f https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/api/v1/health || echo "Health check failed, but deployment completed"
