@@ -10,6 +10,7 @@ env:
   ACR_REGISTRY: askzodiaqacr.azurecr.io
   IMAGE_NAME: ask-zodiaq
   WEBAPP_NAME: ask-zodiaq-app
+  RESOURCE_GROUP: my-openai-resource
 
 jobs:
   build-and-deploy:
@@ -35,12 +36,23 @@ jobs:
           docker push ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           docker push ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
-      - name: Deploy new image to Azure Web App
-        uses: azure/webapps-deploy@v3
+      - name: Login to Azure
+        uses: azure/login@v2
         with:
-          app-name: ${{ env.WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          images: ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Update Web App container image
+        run: |
+          az webapp config container set \
+            --name ${{ env.WEBAPP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --container-image-name ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Restart Web App
+        run: |
+          az webapp restart \
+            --name ${{ env.WEBAPP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }}
 
       - name: Health check
         run: |
