@@ -871,7 +871,7 @@ def format_business(data: Dict[str, Any], language: str = "English") -> ZodiaQRe
             ),
         ]
         summary  = (
-            f"Business is {business_verdict.lower()} in your chart. "
+            f"Business is {business_verdict} in your chart. "
             f"Top sectors: {top_industries}."
         )
         question = "Should I start my own Business?"
@@ -1031,7 +1031,7 @@ def format_government_job(data: Dict[str, Any], language: str = "English") -> Zo
             timing_item,
         ]
         summary  = (
-            f"Government job is {govt_verdict.lower()} in your chart. "
+            f"Government job is {govt_verdict} in your chart. "
             f"Exam ability: {exam_verdict}."
             + (f" Best window: {nearest_str}." if nearest_str else "")
         )
