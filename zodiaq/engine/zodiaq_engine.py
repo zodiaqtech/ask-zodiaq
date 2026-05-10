@@ -35,6 +35,9 @@ from app.services.astro_api import kp_api, vedic_api          # singletons
 from app.services.astro_engine import AstroEngine
 from app.services.timing_engine import kp_timing_engine       # KPTimingEngine singleton
 
+# Local ephemeris — zero-cost transit scoring via pyswisseph
+from zodiaq.engine import local_ephemeris
+
 # Domain evaluators (also from AI-predigest)
 from app.domains.marriage.marriage_prospects.evaluator import (
     MarriageProspectsEvaluator,
@@ -155,23 +158,53 @@ def get_timing_windows(
     max_windows: int = 5,
 ) -> List[Dict]:
     """
-    Run the KP timing engine synchronously and return raw timing-window dicts.
+    Run KP timing engine with local-ephemeris transit scoring (zero API cost).
+    Falls back to base timing (no transit) if local_ephemeris is unavailable.
     Returns [] if no favourable windows found.
     """
+    # Closures that satisfy calculate_timing_windows_with_transit's callable contract.
+    # Both use pyswisseph locally — no external API call at all.
+    natal_houses = chart.houses  # captured by closure
+
+    def _fetch_transit(mid_date: datetime) -> List[Dict]:
+        return local_ephemeris.get_transit_planets(mid_date, natal_houses)
+
+    def _fetch_kp_snapshot(mid_date: datetime, sex: str, lat: float, lon: float, tzone: str) -> Dict:
+        return local_ephemeris.get_kp_lords_for_date(mid_date)
+
     try:
-        windows = kp_timing_engine.calculate_timing_windows(
+        windows = kp_timing_engine.calculate_timing_windows_with_transit(
             dba_list=chart.flat_dasha,
             dob=chart.dob_dt,
             planets=chart.planets,
             houses=chart.houses,
             domain=domain,
+            fetch_transit_for_date=_fetch_transit,
+            fetch_kp_snapshot=_fetch_kp_snapshot,
+            sex=chart.sex,
+            lat=chart.lat,
+            lon=chart.lon,
+            tzone=str(chart.timezone),
             timing_name=timing_name,
             max_windows=max_windows,
         )
         return windows or []
     except Exception as exc:
-        logger.error(f"get_timing_windows({timing_name}): {exc}")
-        return []
+        logger.warning(f"get_timing_windows({timing_name}) transit path failed ({exc}); falling back to base timing")
+        try:
+            windows = kp_timing_engine.calculate_timing_windows(
+                dba_list=chart.flat_dasha,
+                dob=chart.dob_dt,
+                planets=chart.planets,
+                houses=chart.houses,
+                domain=domain,
+                timing_name=timing_name,
+                max_windows=max_windows,
+            )
+            return windows or []
+        except Exception as exc2:
+            logger.error(f"get_timing_windows({timing_name}) base fallback also failed: {exc2}")
+            return []
 
 
 def _fmt_date_range(window: Optional[Dict]) -> Optional[str]:

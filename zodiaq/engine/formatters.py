@@ -192,18 +192,45 @@ def _ordinal_hi(n: int) -> str:
 
 
 def _window_reason(window: Optional[Dict], language: str = "English") -> str:
-    """'Dasha: Ra-Su-Mo | KP Score: 17.5/100'"""
+    """
+    Rich astrological reason: Dasha, KP score, transit support, age, and delay info.
+    Example: "Dasha: Rahu MD · Sun AD · Moon PD | KP: 42.0 | Transit: +8.2 (strong) | Age: 28"
+    """
     if not window:
         return ""
     parts = []
+    hi    = _is_hindi(language)
     dasha = window.get("dasha", "")
     score = window.get("final_score") or window.get("score")
+    transit_score = window.get("transit_score")
+    age   = window.get("age_at_start")
+    delay = window.get("delay_years")
+    retrograde_flag = window.get("needs_resonant_jump", False)
+
     if dasha:
-        label = "दशा" if _is_hindi(language) else "Dasha"
+        label = "दशा" if hi else "Dasha"
         parts.append(f"{label}: {_expand_dasha(dasha, language)}")
+
     if score is not None:
-        label = "KP स्कोर" if _is_hindi(language) else "KP Score"
+        label = "KP स्कोर" if hi else "KP Score"
         parts.append(f"{label}: {score:.1f}/100")
+
+    if transit_score is not None and transit_score != 0:
+        sign  = "+" if transit_score >= 0 else ""
+        label = "गोचर" if hi else "Transit"
+        parts.append(f"{label}: {sign}{transit_score:.1f}")
+
+    if age is not None:
+        label = "आयु" if hi else "Age"
+        parts.append(f"{label}: {int(age)}")
+
+    if delay and delay > 0:
+        label = "देरी" if hi else "Delay"
+        parts.append(f"{label}: ~{int(delay)}y (retrograde)")
+
+    if retrograde_flag:
+        parts.append("वक्री-विलंब संभव" if hi else "retrograde delay possible")
+
     return " | ".join(parts)
 
 
@@ -227,6 +254,71 @@ def _window_strength(window: Optional[Dict], language: str = "English") -> str:
         if score >= 35:
             return "moderate"
         return "mild"
+
+
+_DASHA_MARRIAGE_EN: Dict[str, str] = {
+    "Venus":   "Venus is the natural karaka of love and partnerships — very auspicious for marriage",
+    "Jupiter": "Jupiter blesses unions and expands family — highly favourable for marriage",
+    "Moon":    "Moon rules emotions and bonding — a sensitive, nurturing period for relationships",
+    "Mars":    "Mars activates 7th-house energy — quick decisions possible, watch impulsiveness",
+    "Mercury": "Mercury smooths communication and agreements — good for marriage negotiations",
+    "Saturn":  "Saturn brings responsibility and stability, but may create delays",
+    "Sun":     "Sun highlights partnerships publicly — prominent union possible",
+    "Rahu":    "Rahu can trigger sudden or unconventional unions, especially cross-culture",
+    "Ketu":    "Ketu is spiritually detached — marriage may arise from karmic or unexpected circumstances",
+}
+_DASHA_MARRIAGE_HI: Dict[str, str] = {
+    "Venus":   "शुक्र प्रेम और विवाह का नैसर्गिक कारक है — विवाह के लिए अत्यंत शुभ काल",
+    "Jupiter": "बृहस्पति गृहस्थ जीवन को आशीर्वाद देते हैं — परिवार विस्तार हेतु बहुत अनुकूल",
+    "Moon":    "चंद्रमा भावनात्मक जुड़ाव और बंधन का कारक — रिश्तों के लिए संवेदनशील व अनुकूल काल",
+    "Mars":    "मंगल सप्तम भाव को सक्रिय करते हैं — निर्णय जल्दी हो सकता है, आवेग पर ध्यान दें",
+    "Mercury": "बुध संवाद और समझौते को सुगम बनाते हैं — विवाह वार्ता के लिए उपयुक्त",
+    "Saturn":  "शनि जिम्मेदारी और स्थिरता लाते हैं, किंतु विलंब की संभावना बनी रहती है",
+    "Sun":     "सूर्य दशा में विवाह सामाजिक रूप से प्रमुख हो सकता है",
+    "Rahu":    "राहु अचानक या असामान्य विवाह का संकेत देते हैं, अंतरजातीय संभावना भी",
+    "Ketu":    "केतु आध्यात्मिक वैराग्य का कारक — विवाह कर्मगत या अप्रत्याशित परिस्थितियों से हो सकता है",
+}
+
+_DASHA_CAREER_EN: Dict[str, str] = {
+    "Sun":     "Sun's period favours government roles, authority, and leadership",
+    "Moon":    "Moon's period suits public-dealing, hospitality, and emotional intelligence roles",
+    "Mars":    "Mars activates effort and drive — good for competitive fields, engineering, defence",
+    "Mercury": "Mercury sharpens intellect and communication — IT, finance, and teaching thrive",
+    "Jupiter": "Jupiter expands opportunities — education, law, consulting, and management benefit",
+    "Venus":   "Venus brings creativity — arts, media, hospitality, and luxury sectors are supported",
+    "Saturn":  "Saturn rewards discipline and hard work — steady career growth over time",
+    "Rahu":    "Rahu accelerates unconventional career paths — technology, foreign firms, media",
+    "Ketu":    "Ketu promotes research, spirituality, and niche expertise",
+}
+_DASHA_CAREER_HI: Dict[str, str] = {
+    "Sun":     "सूर्य दशा सरकारी भूमिका, अधिकार और नेतृत्व के लिए अनुकूल है",
+    "Moon":    "चंद्रमा दशा में जन-सेवा, आतिथ्य और भावनात्मक बुद्धिमत्ता के क्षेत्र उपयुक्त हैं",
+    "Mars":    "मंगल प्रयास और ऊर्जा को सक्रिय करते हैं — इंजीनियरिंग, रक्षा और प्रतिस्पर्धी क्षेत्र अनुकूल",
+    "Mercury": "बुध बौद्धिक क्षमता बढ़ाते हैं — आईटी, वित्त और शिक्षण में अच्छे अवसर",
+    "Jupiter": "बृहस्पति अवसरों का विस्तार करते हैं — शिक्षा, कानून, परामर्श और प्रबंधन लाभकर",
+    "Venus":   "शुक्र सृजनात्मकता लाते हैं — कला, मीडिया, आतिथ्य और विलासिता क्षेत्र सक्रिय",
+    "Saturn":  "शनि अनुशासन और परिश्रम को पुरस्कृत करते हैं — करियर में धीरे-धीरे स्थिर विकास",
+    "Rahu":    "राहु असामान्य करियर पथ को गति देते हैं — प्रौद्योगिकी, विदेशी कंपनियाँ, मीडिया",
+    "Ketu":    "केतु अनुसंधान, अध्यात्म और विशेष विशेषज्ञता को बढ़ावा देते हैं",
+}
+
+
+def _dasha_md_quality(dasha_str: str, context: str, language: str) -> str:
+    """Return a one-line dasha-lord quality note for the Mahadasha planet."""
+    if not dasha_str:
+        return ""
+    md = dasha_str.split("-")[0] if "-" in dasha_str else dasha_str
+    # Expand abbreviation
+    md_full = _DASHA_FULL.get(md, md)
+    if context == "marriage":
+        table_en = _DASHA_MARRIAGE_EN
+        table_hi = _DASHA_MARRIAGE_HI
+    else:
+        table_en = _DASHA_CAREER_EN
+        table_hi = _DASHA_CAREER_HI
+    if _is_hindi(language):
+        return table_hi.get(md_full, "")
+    return table_en.get(md_full, "")
 
 
 def _promise_summary(state: Optional[str], language: str = "English") -> str:
@@ -315,19 +407,37 @@ def format_marriage(data: Dict[str, Any], language: str = "English") -> ZodiaQRe
 
     # ── Timing items ──────────────────────────────────────────────────────────
     if nearest_str:
+        base_reason  = _window_reason(nearest, language)
+        dasha_note   = _dasha_md_quality(nearest.get("dasha", ""), "marriage", language)
+        transit_ok   = (nearest.get("transit_score") or 0) > 0
+        if hi:
+            transit_note = "गोचर ग्रह इस काल को अतिरिक्त समर्थन दे रहे हैं।" if transit_ok else ""
+            full_reason  = " | ".join(filter(None, [base_reason, dasha_note, transit_note]))
+        else:
+            transit_note = "Transiting planets additionally support this window." if transit_ok else ""
+            full_reason  = " | ".join(filter(None, [base_reason, dasha_note, transit_note]))
         items.append(ZodiaQItem(
             label="अगला अनुकूल योग" if hi else "Next favourable Yog",
             type=ItemType.TIMING,
             timing=nearest_str,
-            astro_reason=_window_reason(nearest, language),
+            astro_reason=full_reason,
         ))
 
     if best_str and not same_window:
+        base_reason  = _window_reason(best, language)
+        dasha_note   = _dasha_md_quality(best.get("dasha", ""), "marriage", language)
+        transit_ok   = (best.get("transit_score") or 0) > 0
+        if hi:
+            transit_note = "यह काल गोचर ग्रहों द्वारा भी समर्थित है — उच्च संभावना।" if transit_ok else ""
+            full_reason  = " | ".join(filter(None, [base_reason, dasha_note, transit_note]))
+        else:
+            transit_note = "Transit planets reinforce this as the peak window." if transit_ok else ""
+            full_reason  = " | ".join(filter(None, [base_reason, dasha_note, transit_note]))
         items.append(ZodiaQItem(
             label="सबसे अनुकूल योग" if hi else "Most favourable Yog",
             type=ItemType.TIMING,
             timing=best_str,
-            astro_reason=_window_reason(best, language),
+            astro_reason=full_reason,
         ))
     elif same_window and items:
         items[0].label = "सबसे अनुकूल और अगला योग" if hi else "Most & Next favourable Yog"
@@ -385,20 +495,25 @@ def format_marriage(data: Dict[str, Any], language: str = "English") -> ZodiaQRe
     csl7      = data.get("csl7", "—")
     if direction and direction != "—":
         if hi:
-            csl7_note = f"सातवें भाव का CSL {_planet(csl7, language)} है। " if csl7 and csl7 != "—" else ""
+            csl7_p    = _planet(csl7, language)
+            csl7_note = f"सप्तम भाव का CSL {csl7_p} है, जो उस राशि का स्वामी है जिससे दिशा निकाली जाती है।" if csl7 and csl7 != "—" else "सप्तम भाव की राशि से दिशा निकाली जाती है।"
             items.append(ZodiaQItem(
                 label="जीवनसाथी के जन्मस्थान की दिशा",
                 type=ItemType.TEXT,
                 value=direction,
-                astro_reason=f"{csl7_note}KP पद्धति में सातवें भाव की राशि से दिशा निर्धारित।",
+                astro_reason=f"KP पद्धति में {csl7_note}",
             ))
         else:
-            csl7_note = f"7th CSL is {csl7}. " if csl7 and csl7 != "—" else ""
+            csl7_note = (
+                f"7th house CSL is {csl7}, whose sign determines the direction."
+                if csl7 and csl7 != "—" else
+                "Direction is derived from the 7th cusp sign in the KP system."
+            )
             items.append(ZodiaQItem(
                 label="Direction of your spouse's birthplace",
                 type=ItemType.TEXT,
                 value=direction,
-                astro_reason=f"{csl7_note}Direction derived from 7th cusp sign in KP system.",
+                astro_reason=csl7_note,
             ))
 
     # ── Summary ───────────────────────────────────────────────────────────────
@@ -445,11 +560,20 @@ def format_job(data: Dict[str, Any], language: str = "English") -> ZodiaQRespons
 
     # ── Timing ────────────────────────────────────────────────────────────────
     if nearest_str:
+        base_reason = _window_reason(nearest, language)
+        dasha_note  = _dasha_md_quality(nearest.get("dasha", ""), "career", language)
+        transit_ok  = (nearest.get("transit_score") or 0) > 0
+        if hi:
+            transit_note = "गोचर ग्रह इस नौकरी-काल को और सशक्त बना रहे हैं।" if transit_ok else ""
+            full_reason  = " | ".join(filter(None, [base_reason, dasha_note, transit_note]))
+        else:
+            transit_note = "Transiting planets add further support to this employment window." if transit_ok else ""
+            full_reason  = " | ".join(filter(None, [base_reason, dasha_note, transit_note]))
         items.append(ZodiaQItem(
             label="नौकरी मिलने की संभावित अवधि" if hi else "Likely period to secure a job",
             type=ItemType.TIMING,
             timing=nearest_str,
-            astro_reason=_window_reason(nearest, language),
+            astro_reason=full_reason,
         ))
     else:
         items.append(ZodiaQItem(
@@ -463,15 +587,15 @@ def format_job(data: Dict[str, Any], language: str = "English") -> ZodiaQRespons
     if hi:
         if has_obstacles:
             obs_reason = (
-                f"छठे भाव CSL ({csl6_p}), दसवें भाव CSL ({csl10_p}) — "
-                f"{weak_lords} कमजोर ग्रह {strong_lords} मजबूत ग्रहों से अधिक; "
-                "करियर स्थिर होने से पहले कुछ बाधाएं अपेक्षित।"
+                f"षष्ठ भाव CSL {csl6_p} और दशम भाव CSL {csl10_p} की KP जाँच में "
+                f"{weak_lords} ग्रह कमज़ोर और {strong_lords} ग्रह बलवान पाए गए — "
+                "करियर स्थिर होने से पहले कुछ बाधाएँ और संघर्ष संभव हैं।"
             )
         else:
             obs_reason = (
-                f"छठे भाव CSL ({csl6_p}), दसवें भाव CSL ({csl10_p}) — "
-                f"{strong_lords} मजबूत ग्रह {weak_lords} कमजोर ग्रहों से अधिक; "
-                "करियर मार्ग अपेक्षाकृत स्पष्ट।"
+                f"षष्ठ भाव CSL {csl6_p} और दशम भाव CSL {csl10_p} की KP जाँच में "
+                f"{strong_lords} ग्रह बलवान और {weak_lords} ग्रह कमज़ोर पाए गए — "
+                "करियर मार्ग अपेक्षाकृत सुगम और बाधामुक्त दिखता है।"
             )
         items.append(ZodiaQItem(
             label="कुंडली में करियर बाधाएं",
@@ -480,19 +604,23 @@ def format_job(data: Dict[str, Any], language: str = "English") -> ZodiaQRespons
             astro_reason=obs_reason,
         ))
     else:
+        if has_obstacles:
+            obs_reason = (
+                f"6th CSL ({csl6}) governs service; 10th CSL ({csl10}) governs profession. "
+                f"KP scoring shows {weak_lords} weak lord(s) outweighing {strong_lords} strong — "
+                "expect some hurdles before career stabilises."
+            )
+        else:
+            obs_reason = (
+                f"6th CSL ({csl6}) governs service; 10th CSL ({csl10}) governs profession. "
+                f"{strong_lords} strong lord(s) outweigh {weak_lords} weak — "
+                "career path is relatively clear and obstacle-free."
+            )
         items.append(ZodiaQItem(
             label="Career obstacles in the chart",
             type=ItemType.VERDICT,
             verdict="Yes" if has_obstacles else "No",
-            astro_reason=(
-                f"6th CSL ({csl6}), 10th CSL ({csl10}) — "
-                f"{weak_lords} weak lord(s) outweigh {strong_lords} strong lord(s); "
-                "some hurdles expected before career stabilises."
-                if has_obstacles else
-                f"6th CSL ({csl6}), 10th CSL ({csl10}) — "
-                f"{strong_lords} strong lord(s) outweigh {weak_lords} weak lord(s); "
-                "career path is relatively clear."
-            ),
+            astro_reason=obs_reason,
         ))
 
     promise_label  = _promise_summary(data.get("promise_state"), language)
@@ -531,13 +659,15 @@ def format_house(data: Dict[str, Any], language: str = "English") -> ZodiaQRespo
     if hi:
         if purchase_verdict == "Yes":
             astro_rsn = (
-                f"चौथे भाव CSL ({csl4}), ग्यारहवें भाव CSL ({csl11}) — "
-                "संपत्ति और लाभ भावों में मजबूत संकेत।"
+                f"KP पद्धति में चतुर्थ भाव संपत्ति का और एकादश भाव लाभ का कारक है। "
+                f"चतुर्थ भाव CSL {csl4} और एकादश भाव CSL {csl11} — "
+                "दोनों भावों में ग्रह-संकेत मजबूत हैं, संपत्ति खरीद संभव है।"
             )
         else:
             astro_rsn = (
-                f"चौथे भाव CSL ({csl4}), ग्यारहवें भाव CSL ({csl11}) — "
-                "संपत्ति भावों में कुछ देरी; धैर्य की सिफारिश।"
+                f"KP पद्धति में चतुर्थ भाव संपत्ति का और एकादश भाव लाभ का कारक है। "
+                f"चतुर्थ भाव CSL {csl4} और एकादश भाव CSL {csl11} — "
+                "वर्तमान में संपत्ति भावों में कुछ बाधा दिखती है; सही समय की प्रतीक्षा करें।"
             )
         items = [
             ZodiaQItem(
@@ -556,11 +686,13 @@ def format_house(data: Dict[str, Any], language: str = "English") -> ZodiaQRespo
                 verdict=purchase_verdict,
                 timing=nearest_str,
                 astro_reason=(
-                    f"4th CSL ({data.get('csl4','—')}), 11th CSL ({data.get('csl11','—')}) — "
-                    "property and gain houses show strong signification."
+                    f"In KP, the 4th house (property) and 11th house (gain) are key. "
+                    f"4th CSL ({data.get('csl4','—')}) and 11th CSL ({data.get('csl11','—')}) "
+                    "both show strong favourable signification — property acquisition is supported."
                     if purchase_verdict == "Yes" else
-                    f"4th CSL ({data.get('csl4','—')}), 11th CSL ({data.get('csl11','—')}) — "
-                    "property houses show some delay; patience recommended."
+                    f"In KP, the 4th house (property) and 11th house (gain) are key. "
+                    f"4th CSL ({data.get('csl4','—')}) and 11th CSL ({data.get('csl11','—')}) "
+                    "show some restriction — patience and awaiting the right dasha period is advised."
                 ),
             ),
         ]
@@ -685,9 +817,15 @@ def format_business(data: Dict[str, Any], language: str = "English") -> ZodiaQRe
 
     if hi:
         if business_verdict == "Yes":
-            biz_reason = "व्यवसाय भाव (दूसरा, सातवाँ, ग्यारहवाँ) में अनुकूल संकेत।"
+            biz_reason = (
+                "KP पद्धति में व्यवसाय के मुख्य भाव हैं — द्वितीय (धन), सप्तम (साझेदारी) और "
+                "एकादश (लाभ)। आपकी कुंडली में इन भावों के ग्रह-संकेत अनुकूल हैं।"
+            )
         else:
-            biz_reason = "कुंडली स्वतंत्र व्यवसाय की तुलना में सेवा/रोजगार की ओर झुकती है।"
+            biz_reason = (
+                "KP विश्लेषण में व्यवसाय भाव (द्वितीय, सप्तम, एकादश) की तुलना में "
+                "सेवा भाव (षष्ठ, दशम) अधिक प्रबल हैं — कुंडली नौकरी की ओर अधिक झुकती है।"
+            )
 
         items = [
             ZodiaQItem(
@@ -718,16 +856,18 @@ def format_business(data: Dict[str, Any], language: str = "English") -> ZodiaQRe
                 type=ItemType.VERDICT,
                 verdict=business_verdict,
                 astro_reason=(
-                    "Business houses (2nd, 7th, 11th) show favourable signification."
+                    "KP business houses (2nd — wealth, 7th — partnership, 11th — profit) "
+                    "show strong favourable signification in your chart."
                     if business_verdict == "Yes" else
-                    "Chart leans toward service/employment over independent business."
+                    "KP analysis shows the service houses (6th, 10th) are stronger than "
+                    "business houses (2nd, 7th, 11th) — chart leans toward employment."
                 ),
             ),
             ZodiaQItem(
                 label="Favourable industries for you",
                 type=ItemType.TEXT,
                 value=top_industries if top_industries and top_industries != "—" else "General Trade / Services",
-                astro_reason="Derived from planetary business suitability matrix.",
+                astro_reason="Derived from 10th house CSL and planetary business suitability matrix.",
             ),
         ]
         summary  = (
@@ -765,26 +905,33 @@ def format_government_job(data: Dict[str, Any], language: str = "English") -> Zo
     if hi:
         sun_desc  = f"{_ordinal_hi(sun_house)} भाव में सूर्य" if sun_house else "सूर्य"
         if sun_retro:
-            sun_desc += " (वक्री)"
+            sun_desc += " (वक्री — सरकारी मामलों में सावधानी आवश्यक)"
         csl10_p  = _planet(csl10, language)
-        csl10_desc   = f"दसवें भाव का CSL {csl10_p} है" if csl10 not in ("—", "") else "दसवाँ भाव CSL"
+        csl10_desc   = f"दशम भाव का CSL {csl10_p} है" if csl10 not in ("—", "") else "दशम भाव CSL"
         mercury_desc = f"{_ordinal_hi(mercury_house)} भाव में बुध" if mercury_house else "बुध"
         saturn_desc  = f"{_ordinal_hi(saturn_house)} भाव में शनि" if saturn_house else "शनि"
 
         if govt_verdict == "Yes":
-            govt_reason = f"{sun_desc} और {csl10_desc} — सरकारी सेवा की मजबूत संभावना।"
+            govt_reason = (
+                f"सूर्य सरकार और अधिकार का नैसर्गिक कारक है। "
+                f"{sun_desc} और {csl10_desc} — कुंडली में सरकारी सेवा की प्रबल संभावना दिखती है।"
+            )
         else:
-            govt_reason = f"{sun_desc}; {csl10_desc} — कुंडली सरकारी भूमिका के लिए दृढ़ता से अनुकूल नहीं।"
+            govt_reason = (
+                f"सूर्य सरकार और अधिकार का नैसर्गिक कारक है। "
+                f"{sun_desc}; {csl10_desc} — वर्तमान स्थिति में कुंडली सरकारी भूमिका के लिए दृढ़ता से अनुकूल नहीं है।"
+            )
 
         if exam_verdict == "Yes":
             exam_reason = (
-                f"{mercury_desc} (बुद्धि) और {saturn_desc} (अनुशासन) "
-                "अच्छे स्थान पर — परीक्षा क्षमता मजबूत।"
+                f"बुध बुद्धि और स्मरण का कारक है, शनि अनुशासन और कठिन परिश्रम का। "
+                f"{mercury_desc} और {saturn_desc} — दोनों की अनुकूल स्थिति परीक्षा में सफलता का संकेत देती है।"
             )
         else:
             exam_reason = (
+                f"बुध बुद्धि का कारक है और शनि अनुशासन का। "
                 f"{mercury_desc} और {saturn_desc} — "
-                "अतिरिक्त तैयारी और अनुशासन की आवश्यकता।"
+                "इनकी वर्तमान स्थिति अनुकूल नहीं है; नियमित तैयारी और अनुशासन बहुत आवश्यक है।"
             )
 
         if nearest_str:
@@ -820,9 +967,9 @@ def format_government_job(data: Dict[str, Any], language: str = "English") -> Zo
         govt_verdict_hi = _VERDICT_HI.get(govt_verdict, govt_verdict)
         exam_verdict_hi = _VERDICT_HI.get(exam_verdict, exam_verdict)
         summary  = (
-            f"आपकी कुंडली में सरकारी नौकरी {govt_verdict_hi} है। "
-            f"परीक्षा क्षमता: {exam_verdict_hi}।"
-            + (f" सबसे अच्छी अवधि: {nearest_str}।" if nearest_str else "")
+            f"आपकी कुंडली में सरकारी नौकरी की संभावना {govt_verdict_hi} है। "
+            f"परीक्षा उत्तीर्ण करने की क्षमता {exam_verdict_hi} दिखती है।"
+            + (f" सबसे उपयुक्त अवधि: {nearest_str}।" if nearest_str else "")
         )
         question = "क्या मुझे सरकारी नौकरी मिलेगी?"
         category = "सरकारी नौकरी भविष्यवाणी"
@@ -830,17 +977,22 @@ def format_government_job(data: Dict[str, Any], language: str = "English") -> Zo
     else:
         sun_desc     = f"Sun in {_ordinal(sun_house)} house" if sun_house else "Sun"
         if sun_retro:
-            sun_desc += " (retrograde)"
+            sun_desc += " (retrograde — caution with authorities)"
         csl10_desc   = f"10th CSL is {csl10}" if csl10 not in ("—", "") else "10th CSL"
         mercury_desc = f"Mercury in {_ordinal(mercury_house)} house" if mercury_house else "Mercury"
         saturn_desc  = f"Saturn in {_ordinal(saturn_house)} house" if saturn_house else "Saturn"
 
         if nearest_str:
+            base_reason  = _window_reason(nearest, language) if nearest else _NO_DASHA_EN
+            dasha_note   = _dasha_md_quality(nearest.get("dasha", ""), "career", language) if nearest else ""
+            transit_ok   = nearest is not None and (nearest.get("transit_score") or 0) > 0
+            transit_note = "Transiting planets reinforce this as a strong exam period." if transit_ok else ""
+            full_reason  = " | ".join(filter(None, [base_reason, dasha_note, transit_note]))
             timing_item = ZodiaQItem(
                 label="Favourable period for government exam success",
                 type=ItemType.TIMING,
                 timing=nearest_str,
-                astro_reason=_window_reason(nearest, language) if nearest else _NO_DASHA_EN,
+                astro_reason=full_reason,
             )
         else:
             timing_item = ZodiaQItem(
@@ -856,9 +1008,11 @@ def format_government_job(data: Dict[str, Any], language: str = "English") -> Zo
                 type=ItemType.VERDICT,
                 verdict=govt_verdict,
                 astro_reason=(
+                    f"Sun is the natural karaka for government and authority. "
                     f"{sun_desc} and {csl10_desc} indicate strong government service potential."
                     if govt_verdict == "Yes" else
-                    f"{sun_desc}; {csl10_desc} — chart does not strongly favour a government role."
+                    f"Sun is the natural karaka for government. "
+                    f"{sun_desc}; {csl10_desc} — chart does not strongly favour a government role at present."
                 ),
             ),
             ZodiaQItem(
@@ -866,11 +1020,12 @@ def format_government_job(data: Dict[str, Any], language: str = "English") -> Zo
                 type=ItemType.VERDICT,
                 verdict=exam_verdict,
                 astro_reason=(
-                    f"{mercury_desc} (intellect) and {saturn_desc} (discipline) "
-                    "are well-placed — exam potential is strong."
+                    f"Mercury rules intellect; Saturn rules discipline and sustained effort. "
+                    f"{mercury_desc} and {saturn_desc} are well-placed — exam clearing potential is strong."
                     if exam_verdict == "Yes" else
-                    f"{mercury_desc} and {saturn_desc} — "
-                    "extra preparation and discipline needed."
+                    f"Mercury rules intellect; Saturn rules discipline. "
+                    f"{mercury_desc} and {saturn_desc} require strengthening — "
+                    "consistent preparation and structured study are essential."
                 ),
             ),
             timing_item,
