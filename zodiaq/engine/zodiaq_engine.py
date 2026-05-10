@@ -166,8 +166,9 @@ def get_timing_windows(
     # Both use pyswisseph locally — no external API call at all.
     natal_houses = chart.houses  # captured by closure
 
-    def _fetch_transit(mid_date: datetime) -> List[Dict]:
-        return local_ephemeris.get_transit_planets(mid_date, natal_houses)
+    def _fetch_transit(mid_date: datetime) -> Dict:
+        planets_list = local_ephemeris.get_transit_planets(mid_date, natal_houses)
+        return {p["name"]: p for p in planets_list}
 
     def _fetch_kp_snapshot(mid_date: datetime, sex: str, lat: float, lon: float, tzone: str) -> Dict:
         return local_ephemeris.get_kp_lords_for_date(mid_date)
