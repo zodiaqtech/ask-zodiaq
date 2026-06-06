@@ -126,12 +126,12 @@ _PROMISE_LABELS_HI = {
 
 # ── Generic fallback text ─────────────────────────────────────────────────────
 
-_NO_WINDOW_EN   = "Could not determine — please verify birth details"
-_NO_WINDOW_HI   = "निर्धारित नहीं किया जा सका — कृपया जन्म विवरण सत्यापित करें"
-_NO_DASHA_EN    = "No favourable dasha window found in the next 7 years."
-_NO_DASHA_HI    = "अगले 7 वर्षों में कोई अनुकूल दशा अवधि नहीं मिली।"
-_NO_WINDOW_7_EN = "No clear window in next 7 years — revisit after checking extended dasha"
-_NO_WINDOW_7_HI = "अगले 7 वर्षों में कोई स्पष्ट अवधि नहीं — विस्तारित दशा जांचने के बाद पुनः देखें"
+_NO_WINDOW_EN   = "Consult an astrologer for personalised timing guidance"
+_NO_WINDOW_HI   = "व्यक्तिगत समय मार्गदर्शन के लिए ज्योतिषी से परामर्श करें"
+_NO_DASHA_EN    = "The current planetary periods require deeper analysis for precise timing."
+_NO_DASHA_HI    = "सटीक समय निर्धारण के लिए वर्तमान ग्रह दशाओं का गहन विश्लेषण आवश्यक है।"
+_NO_WINDOW_7_EN = "Timing requires deeper analysis — consult an astrologer for guidance"
+_NO_WINDOW_7_HI = "समय निर्धारण के लिए गहन विश्लेषण आवश्यक — ज्योतिषी से परामर्श करें"
 _VERIFY_DOB_EN  = "Timing unclear — please verify birth details"
 _VERIFY_DOB_HI  = "समय अस्पष्ट — कृपया जन्म विवरण सत्यापित करें"
 
@@ -379,6 +379,7 @@ _CAREER_FIELDS_HI: Dict[str, str] = {
         "प्रौद्योगिकी, विदेशी कंपनियां, नवाचार, मीडिया",
     "Research, Spirituality, Alternative Medicine, IT":
         "अनुसंधान, अध्यात्म, वैकल्पिक चिकित्सा, आईटी",
+    "General Trade / Services": "सामान्य व्यापार / सेवाएं",
     "—": "—",
 }
 
@@ -842,11 +843,12 @@ def format_business(data: Dict[str, Any], language: str = "English") -> ZodiaQRe
             ),
         ]
         verdict_hi = _VERDICT_HI.get(business_verdict, business_verdict)
+        top_industries_hi = _CAREER_FIELDS_HI.get(top_industries, top_industries) if top_industries and top_industries != "—" else "सामान्य व्यापार / सेवाएं"
         summary  = (
             f"आपकी कुंडली में व्यवसाय {verdict_hi} है। "
-            f"प्रमुख क्षेत्र: {top_industries}।"
+            f"प्रमुख क्षेत्र: {top_industries_hi}।"
         )
-        question = "क्या मुझे अपना व्यवसाय शुरू करना चाहिए?"
+        question = "क्या मुझे अपना खुद का व्यवसाय शुरू करना चाहिए?"
         category = "व्यवसाय संभावना"
         consult  = _CONSULT_BUSINESS_HI
     else:

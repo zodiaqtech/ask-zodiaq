@@ -229,6 +229,61 @@ def get_timing_windows(
             return []
 
 
+def get_timing_windows_relaxed(
+    chart: ChartData,
+    timing_name: str,
+    domain: str = "Marriage",
+    max_windows: int = 3,
+) -> List[Dict]:
+    """
+    Fallback: score all dasha periods without the strict KP/ruling-planet
+    filters and return the best ones.  Used when get_timing_windows returns
+    nothing so we can still show *something* positive to the user.
+    """
+    try:
+        from app.services.timing_engine import (
+            score_periods_with_planet_scores,
+            score_kp_all_planets,
+            filter_by_age,
+            format_timing_windows,
+            TIMING_RULES,
+            normalize_planet_name,
+            tag_retro_delay,
+        )
+
+        timing_rules = TIMING_RULES.get(timing_name, TIMING_RULES.get("Marriage Timing"))
+        planet_scores = score_kp_all_planets(chart.planets, chart.houses, timing_rules)
+        planet_score_lookup = {p["planet"]: p for p in planet_scores}
+
+        scored = score_periods_with_planet_scores(chart.flat_dasha, planet_score_lookup)
+        after_age = filter_by_age(scored, chart.dob_dt, domain)
+
+        KEY = set(timing_rules.get("key_planets", {"Venus", "Jupiter", "Moon"}))
+        for w in after_age:
+            score = w.get("total_score", 0)
+            maha = normalize_planet_name(w.get("maha") or w.get("md"))
+            antara = normalize_planet_name(w.get("antara") or w.get("ad"))
+            paryantar = normalize_planet_name(w.get("paryantar") or w.get("pd"))
+            if maha in KEY:
+                score += 4
+            if antara in KEY:
+                score += 3
+            if paryantar in KEY:
+                score += 2
+            w["_domain_score"] = score
+
+        after_age = tag_retro_delay(after_age, chart.planets)
+        final = sorted(after_age, key=lambda x: x.get("_domain_score", 0), reverse=True)[:max_windows]
+
+        windows = format_timing_windows(final)
+        for w in windows:
+            w["is_relaxed"] = True
+        return windows
+    except Exception as exc:
+        logger.error(f"get_timing_windows_relaxed({timing_name}): {exc}")
+        return []
+
+
 def _fmt_date_range(window: Optional[Dict]) -> Optional[str]:
     """Convert a timing window to a human-readable date range string."""
     if not window:
@@ -314,8 +369,10 @@ async def evaluate_marriage(chart: ChartData) -> Dict[str, Any]:
     result = _marriage_eval.evaluate(chart.planets, chart.houses)
     ad     = result.additional_data or {}
 
-    # Timing windows
+    # Timing windows — fall back to relaxed scoring if strict filters yield nothing
     windows = get_timing_windows(chart, "Marriage Timing", domain="Marriage")
+    if not windows:
+        windows = get_timing_windows_relaxed(chart, "Marriage Timing", domain="Marriage")
     best, nearest = _best_and_nearest(windows)
 
     # Spouse direction
@@ -392,6 +449,8 @@ async def evaluate_job(chart: ChartData) -> Dict[str, Any]:
     ad     = result.additional_data or {}
 
     windows = get_timing_windows(chart, "Job Start Timing", domain="Career")
+    if not windows:
+        windows = get_timing_windows_relaxed(chart, "Job Start Timing", domain="Career")
     best, nearest = _best_and_nearest(windows)
 
     # Obstacle check: if career house lords are weak or negative promise
@@ -447,6 +506,8 @@ async def evaluate_house(chart: ChartData) -> Dict[str, Any]:
     ad     = result.additional_data or {}
 
     windows = get_timing_windows(chart, "Prospects of Property", domain="Finance")
+    if not windows:
+        windows = get_timing_windows_relaxed(chart, "Prospects of Property", domain="Finance")
     best, nearest = _best_and_nearest(windows)
 
     purchase_verdict = _promise_to_verdict(result.promise_state)
@@ -617,6 +678,8 @@ async def evaluate_government_job(chart: ChartData) -> Dict[str, Any]:
 
     # Timing — use "Job Start Timing" windows (government service is a job)
     windows = get_timing_windows(chart, "Job Start Timing", domain="Career")
+    if not windows:
+        windows = get_timing_windows_relaxed(chart, "Job Start Timing", domain="Career")
     best, nearest = _best_and_nearest(windows)
 
     return {
