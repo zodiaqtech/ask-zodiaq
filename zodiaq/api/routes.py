@@ -11,13 +11,43 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 from zodiaq.models.request import ZodiaQRequest, ZodiaQTopic
-from zodiaq.models.response import ZodiaQResponse
+from zodiaq.models.response import ZodiaQResponse, ItemType
 from zodiaq.engine import zodiaq_engine as engine
 from zodiaq.engine import formatters
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["zodiaq"])
+
+# ── Verdict translation map ──────────────────────────────────────────────────
+_VERDICT_TO_HI = {"Yes": "हाँ", "No": "नहीं", "Moderate": "मध्यम"}
+
+
+def _unify_item_keys(response: ZodiaQResponse, language: str) -> ZodiaQResponse:
+    """
+    Post-process every item so that all three answer keys (timing, verdict,
+    value) carry the same answer string.  Also translates verdict values to
+    Hindi when language == "Hindi".
+    """
+    is_hindi = language.strip().lower() == "hindi"
+
+    for item in response.items:
+        # ── 1. Determine the canonical answer string ─────────────────────
+        if item.type == ItemType.TIMING:
+            answer = item.timing or ""
+        elif item.type == ItemType.VERDICT:
+            raw_verdict = item.verdict or ""
+            # Translate verdict to Hindi if needed
+            answer = _VERDICT_TO_HI.get(raw_verdict, raw_verdict) if is_hindi else raw_verdict
+        else:  # TEXT
+            answer = item.value or ""
+
+        # ── 2. Populate all three keys with the same answer ──────────────
+        item.timing  = answer
+        item.verdict = answer
+        item.value   = answer
+
+    return response
 
 
 @router.post("/ask", response_model=ZodiaQResponse, summary="Ask ZodiaQ — single topic")
@@ -83,6 +113,9 @@ async def ask_zodiaq(req: ZodiaQRequest) -> ZodiaQResponse:
 
         else:
             raise HTTPException(status_code=400, detail=f"Unknown topic: {topic}")
+
+        # ── 3. Unify keys + translate verdicts ────────────────────────
+        response = _unify_item_keys(response, lang)
 
         logger.info(
             f"[ask_zodiaq] ✅ topic={topic.value} → "

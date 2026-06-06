@@ -838,7 +838,7 @@ def format_business(data: Dict[str, Any], language: str = "English") -> ZodiaQRe
             ZodiaQItem(
                 label="आपके लिए अनुकूल उद्योग",
                 type=ItemType.TEXT,
-                value=top_industries if top_industries and top_industries != "—" else "सामान्य व्यापार / सेवाएं",
+                value=_CAREER_FIELDS_HI.get(top_industries, top_industries) if top_industries and top_industries != "—" else "सामान्य व्यापार / सेवाएं",
                 astro_reason="ग्रहों की व्यावसायिक उपयुक्तता मैट्रिक्स से निर्धारित।",
             ),
         ]
