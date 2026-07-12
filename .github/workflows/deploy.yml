@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
 
 env:
-  ACR_REGISTRY: askzodiaqacr.azurecr.io
+  ACR_REGISTRY: askzodiaqacrmz.azurecr.io
   IMAGE_NAME: ask-zodiaq
-  WEBAPP_NAME: ask-zodiaq-app
-  RESOURCE_GROUP: my-openai-resource
+  WEBAPP_NAME: ask-zodiaq-mz
+  RESOURCE_GROUP: ask-zodiaq-rg
 
 jobs:
   build-and-deploy:
@@ -57,4 +57,4 @@ jobs:
       - name: Health check
         run: |
           sleep 40
-          curl -f https://ask-zodiaq-app.azurewebsites.net/api/v1/health || echo "Health check failed"
+          curl -f https://ask-zodiaq-mz.azurewebsites.net/api/v1/health || echo "Health check failed"

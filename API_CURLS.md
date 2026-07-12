@@ -1,13 +1,13 @@
 # Ask ZodiaQ — API Curl Commands
 
-**Base URL:** `https://ask-zodiaq-app.azurewebsites.net`
+**Base URL:** `https://ask-zodiaq-mz.azurewebsites.net`
 
 ---
 
 ## 1. Health Check
 
 ```bash
-curl -s https://ask-zodiaq-app.azurewebsites.net/api/v1/health
+curl -s https://ask-zodiaq-mz.azurewebsites.net/api/v1/health
 ```
 
 ---
@@ -15,7 +15,7 @@ curl -s https://ask-zodiaq-app.azurewebsites.net/api/v1/health
 ## 2. Topics List
 
 ```bash
-curl -s https://ask-zodiaq-app.azurewebsites.net/api/v1/topics
+curl -s https://ask-zodiaq-mz.azurewebsites.net/api/v1/topics
 ```
 
 ---
@@ -23,7 +23,7 @@ curl -s https://ask-zodiaq-app.azurewebsites.net/api/v1/topics
 ## 3. Ask — Marriage (English)
 
 ```bash
-curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
+curl -s -X POST https://ask-zodiaq-mz.azurewebsites.net/api/v1/ask \
   -H "Content-Type: application/json" \
   -d '{"birth_data":{"name":"Test User","dob":"15/05/1990","tob":"10:30","lat":28.6139,"lon":77.2090,"timezone":5.5,"sex":"M"},"topic":"marriage","language":"English"}'
 ```
@@ -33,7 +33,7 @@ curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
 ## 4. Ask — Marriage (Hindi)
 
 ```bash
-curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
+curl -s -X POST https://ask-zodiaq-mz.azurewebsites.net/api/v1/ask \
   -H "Content-Type: application/json" \
   -d '{"birth_data":{"name":"Test User","dob":"15/05/1990","tob":"10:30","lat":28.6139,"lon":77.2090,"timezone":5.5,"sex":"M"},"topic":"marriage","language":"Hindi"}'
 ```
@@ -43,7 +43,7 @@ curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
 ## 5. Ask — Job (Hindi)
 
 ```bash
-curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
+curl -s -X POST https://ask-zodiaq-mz.azurewebsites.net/api/v1/ask \
   -H "Content-Type: application/json" \
   -d '{"birth_data":{"name":"Test User","dob":"15/05/1990","tob":"10:30","lat":28.6139,"lon":77.2090,"timezone":5.5,"sex":"M"},"topic":"job","language":"Hindi"}'
 ```
@@ -53,7 +53,7 @@ curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
 ## 6. Ask — Government Job (Hindi)
 
 ```bash
-curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
+curl -s -X POST https://ask-zodiaq-mz.azurewebsites.net/api/v1/ask \
   -H "Content-Type: application/json" \
   -d '{"birth_data":{"name":"Test User","dob":"15/05/1990","tob":"10:30","lat":28.6139,"lon":77.2090,"timezone":5.5,"sex":"M"},"topic":"government_job","language":"Hindi"}'
 ```
@@ -63,7 +63,7 @@ curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
 ## 7. Ask — House Purchase (Hindi)
 
 ```bash
-curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
+curl -s -X POST https://ask-zodiaq-mz.azurewebsites.net/api/v1/ask \
   -H "Content-Type: application/json" \
   -d '{"birth_data":{"name":"Test User","dob":"15/05/1990","tob":"10:30","lat":28.6139,"lon":77.2090,"timezone":5.5,"sex":"M"},"topic":"house","language":"Hindi"}'
 ```
@@ -73,7 +73,7 @@ curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
 ## 8. Ask — Career Best (Hindi)
 
 ```bash
-curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
+curl -s -X POST https://ask-zodiaq-mz.azurewebsites.net/api/v1/ask \
   -H "Content-Type: application/json" \
   -d '{"birth_data":{"name":"Test User","dob":"15/05/1990","tob":"10:30","lat":28.6139,"lon":77.2090,"timezone":5.5,"sex":"M"},"topic":"career_best","language":"Hindi"}'
 ```
@@ -83,7 +83,7 @@ curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
 ## 9. Ask — Business (Hindi)
 
 ```bash
-curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
+curl -s -X POST https://ask-zodiaq-mz.azurewebsites.net/api/v1/ask \
   -H "Content-Type: application/json" \
   -d '{"birth_data":{"name":"Test User","dob":"15/05/1990","tob":"10:30","lat":28.6139,"lon":77.2090,"timezone":5.5,"sex":"M"},"topic":"business","language":"Hindi"}'
 ```
@@ -95,7 +95,7 @@ curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
 ```bash
 for topic in marriage job government_job house career_best business; do
   echo "\n=== $topic ==="
-  curl -s -X POST https://ask-zodiaq-app.azurewebsites.net/api/v1/ask \
+  curl -s -X POST https://ask-zodiaq-mz.azurewebsites.net/api/v1/ask \
     -H "Content-Type: application/json" \
     -d "{\"birth_data\":{\"name\":\"Test User\",\"dob\":\"15/05/1990\",\"tob\":\"10:30\",\"lat\":28.6139,\"lon\":77.2090,\"timezone\":5.5,\"sex\":\"M\"},\"topic\":\"$topic\",\"language\":\"Hindi\"}"
 done
@@ -169,6 +169,6 @@ done
 ## Docker Image
 
 ```
-askzodiaqacr.azurecr.io/ask-zodiaq:latest   # always latest
-askzodiaqacr.azurecr.io/ask-zodiaq:v5       # Hindi/English bilingual release
+askzodiaqacrmz.azurecr.io/ask-zodiaq:latest   # always latest
+askzodiaqacrmz.azurecr.io/ask-zodiaq:v5       # Hindi/English bilingual release
 ```
